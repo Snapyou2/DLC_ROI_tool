@@ -55,10 +55,9 @@ This tool now supports processing multiple DeepLabCut files with corresponding R
 
 1.  **Prepare your batch CSV file:** Create a CSV file with two columns. The first column should contain the full paths to your `shape.csv` files (the ROI definitions), and the second column should contain the full paths to your DeepLabCut `.h5` or `.csv` files. Do not forget the header row !
     Example `example_batchinput.csv`:
-    ```
-shape_file_path,h5_file_path
-shapes/circ_right_1.csv,h5data/random_mouse.h5
-    ```
+| shape_file_path        | h5_file_path           |
+|------------------------|------------------------|
+| shapes/circ_right_1.csv | h5data/random_mouse.h5 |
 2.  **Click "Process Batch":** In the GUI, click the "Process Batch" button.
 3.  **Select the batch CSV file:** A file dialog will open. Select the batch CSV file you prepared in step 1.
 4.  **View Results:** The tool will process each file pair listed in the batch CSV. An `output.csv` file will be generated in the current working directory (`/DLC_ROI_tool`). This file will contain the analysis results for each processed DeepLabCut file.
