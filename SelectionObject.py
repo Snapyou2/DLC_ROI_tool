@@ -116,7 +116,7 @@ class SelectionObject:
         elif shape_type == "Circle":
             diameter = max(abs(x2 - x1), abs(y2 - y1))
             self.dim1_entry.insert(0, f"{diameter:.2f}")
-            self.dim2_entry.insert(0, "") # No second dimension for circle
+            self.dim2_entry.insert(0, f"{diameter:.2f}") # Set height to diameter for circle
 
 
     def hide(self):
@@ -165,7 +165,9 @@ class SelectionObject:
 
         elif shape_type == "Circle":
             diameter = dim1
-            # For circle, dim2 is not used, diameter is dim1
+            # For circle, dim2 should be equal to dim1 (diameter)
+            if dim2 is None or dim2 == "": # If dim2 is not provided or empty, use dim1
+                dim2 = dim1
             new_x2 = new_x1 + diameter
             new_y2 = new_y1 + diameter
             self.inner_shape = self.canvas.create_oval(new_x1, new_y1, new_x2, new_y2, **select_opts2)

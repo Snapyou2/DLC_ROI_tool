@@ -11,7 +11,7 @@ $ conda env create -f ROI_ENV.yml
 The main one is that it requires pandas to not be on version 1.x. We use `pandas=0.25.3` :).
 
 
-![ROI](static/ROI.jpg)
+![ROI](static/ROI_tool.jpg)
 
 
 ## Launching the GUI
@@ -47,15 +47,17 @@ This will quickly generate you a CSV file with basic stats on your videos, such 
 ### Optional. Save ROIs for Future Analysis
 The `Save ROIs to file` allows you to save your defined ROIs to a CSV file, which can be loaded later to allow for consistency and replication of your analysis.
 
+## Example Files
+For users who do not have DeepLabCut installed, example `.h5` and `.csv` ROI files are provided in the `h5data/` and `shapes/` directories respectively. These can be used to test the program's functionality.
+
 ## Batch Processing
 This tool now supports processing multiple DeepLabCut files with corresponding ROI files in a batch.
 
 1.  **Prepare your batch CSV file:** Create a CSV file with two columns. The first column should contain the full paths to your `shape.csv` files (the ROI definitions), and the second column should contain the full paths to your DeepLabCut `.h5` or `.csv` files. Do not forget the header row !
-    Example `batch_input.csv`:
+    Example `example_batchinput.csv`:
     ```csv
 shape_file_path,h5_file_path
-~/Documents/DLC_ROI_tool/shapes/circle_1, ~/Documents/DLC_ROI_tool/h5_files/video1.h5
-~/Documents/DLC_ROI_tool/shapes/circle_1, ~/Documents/DLC_ROI_tool/h5_files/video2.csv
+shapes/Circ_right_1.csv,h5data/M10_1_720x480_30fpsDLC_Resnet50_Hab_CorrMay19shuffle1_detector_190_snapshot_200.h5
     ```
 2.  **Click "Process Batch":** In the GUI, click the "Process Batch" button.
 3.  **Select the batch CSV file:** A file dialog will open. Select the batch CSV file you prepared in step 1.

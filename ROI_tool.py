@@ -52,11 +52,11 @@ class Application(tk.Frame):
         self.shape_menu.grid(column=0, row=3)
 
         # Dimension display and modification
-        self.dim_label = tk.Label(button_frame, text="Dimensions:")
-        self.dim_label.grid(column=1, row=3)
+        self.dim1_label = tk.Label(button_frame, text="Width (pixels):")
+        self.dim1_label.grid(column=1, row=3)
         self.dim1_entry = tk.Entry(button_frame, width=10)
         self.dim1_entry.grid(column=2, row=3)
-        self.dim2_label = tk.Label(button_frame, text="x")
+        self.dim2_label = tk.Label(button_frame, text="Height (pixels):")
         self.dim2_label.grid(column=3, row=3)
         self.dim2_entry = tk.Entry(button_frame, width=10)
         self.dim2_entry.grid(column=4, row=3)
