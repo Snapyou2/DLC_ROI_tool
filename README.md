@@ -10,6 +10,10 @@ $ conda env create -f ROI_ENV.yml
 ```
 The main one is that it requires pandas to not be on version 1.x. We use `pandas=0.25.3` :).
 
+For batch processing, you will also need `tqdm` for progress bars:
+```bash
+$ pip install tqdm
+```
 
 ![ROI](static/ROI_tool.jpg)
 
@@ -53,8 +57,11 @@ For users who do not have DeepLabCut installed, example `.h5` and `.csv` ROI fil
 ## Batch Processing
 This tool now supports processing multiple DeepLabCut files with corresponding ROI files in a batch.
 
+**Note on Performance:** Batch processing can be a time-consuming operation, especially when dealing with a large number of files, long videos, or high frame rates. The application will display a progress bar in the terminal to indicate its progress. Please be patient, as it may take a significant amount of time to complete.
+
 1.  **Prepare your batch CSV file:** Create a CSV file with two columns. The first column should contain the full paths to your `shape.csv` files (the ROI definitions), and the second column should contain the full paths to your DeepLabCut `.h5` or `.csv` files. Do not forget the header row !
     Example `example_batchinput.csv`:
+
 | shape_file_path        | h5_file_path           |
 |------------------------|------------------------|
 | shapes/circ_right_1.csv | h5data/random_mouse.h5 |
@@ -67,8 +74,8 @@ The `output.csv` file will have the following format:
 -   Subsequent columns: Time spent (in seconds) and number of entries for each defined ROI. Column names will follow the pattern `[ROI Name] time spent` and `[ROI Name] entries`.
 
 Example `output.csv`:
-```csv
-h5_file,ROI1 time spent,ROI2 time spent,ROI1 entries,ROI2 entries
-video1.h5,15.3,20.1,5,3
-video2.csv,10.5,25.9,8,2
-```
+
+| h5_file    | ROI1 time spent | ROI2 time spent | ROI1 entries | ROI2 entries |
+|------------|-----------------|-----------------|--------------|--------------|
+| video1.h5  | 15.3            | 20.1            | 5            | 3            |
+| video2.csv | 10.5            | 25.9            | 8            | 2            |

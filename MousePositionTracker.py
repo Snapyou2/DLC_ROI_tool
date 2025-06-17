@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 from tkinter import Button
 import pandas as pd
 from tkinter import filedialog
-import cv2 # Not directly used in the provided snippets, but kept as it's in the original imports.
+import cv2
 import os
 import numpy as np
 import random
@@ -13,16 +13,23 @@ import glob
 import json
 from tkinter import simpledialog
 from SelectionObject import SelectionObject
+import tqdm
 
-class MousePositionTracker(tk.Frame):
+from tkinter import ttk # Import ttk
+
+class MousePositionTracker(ttk.Frame): # Change to ttk.Frame
     """Tkinter Canvas mouse position tracker and ROI management widget."""
     
-    def __init__(self, canvas, imwidth, imheight, text, my_imo, fps, shape_type_var=None, selection_obj=None):
+    def __init__(self, canvas, imwidth, imheight, text, my_imo, fps, shape_type_var=None, selection_obj=None, image_offset_x=0, image_offset_y=0, displayed_im_width=None, displayed_im_height=None):
         self.text = text
         self.fps = fps
         self.canvas = canvas
         self.shape_type_var = shape_type_var
         self.selection_obj = selection_obj
+        self.image_offset_x = image_offset_x
+        self.image_offset_y = image_offset_y
+        self.displayed_im_width = displayed_im_width if displayed_im_width is not None else 640
+        self.displayed_im_height = displayed_im_height if displayed_im_height is not None else 420
         self.reset()
         
         # Initialize canvas dimensions and cross-hair lines if a canvas is provided.
@@ -55,7 +62,8 @@ class MousePositionTracker(tk.Frame):
         """Re-initializes the mouse position tracker."""
         # Note: In the original code, this also re-initialized SelectionObject.
         # In the refactored code, SelectionObject is passed via __init__ and managed externally.
-        self.posn_tracker = MousePositionTracker(self.canvas,  self.im_width, self.im_height,self.text,self.my_imo, self.fps)
+        # Update this to pass displayed_im_width and displayed_im_height
+        self.posn_tracker = MousePositionTracker(self.canvas,  self.im_width, self.im_height,self.text,self.my_imo, self.fps, displayed_im_width=self.displayed_im_width, displayed_im_height=self.displayed_im_height)
 
     def begin(self, event):
         """Starts a new selection by recording the initial mouse position."""
@@ -64,21 +72,29 @@ class MousePositionTracker(tk.Frame):
         if self.selection_obj:
             self.selection_obj.reset_shape() # Clear any active interactive selection shape
         self.start = (event.x, event.y)
-        self.top_left_X = event.x
-        self.top_left_Y = event.y
-        # Scale coordinates to original image dimensions (assuming canvas is 640x420)
-        self.TLX = self.top_left_X * (self.im_width / 640)
-        self.TLY = self.top_left_Y * (self.im_height / 420)
+        # Adjust event coordinates by image offset before storing
+        adjusted_x = event.x - self.image_offset_x
+        adjusted_y = event.y - self.image_offset_y
+        
+        self.top_left_X = adjusted_x
+        self.top_left_Y = adjusted_y
+        # Scale coordinates to original image dimensions using displayed image dimensions
+        self.TLX = self.top_left_X * (self.im_width / self.displayed_im_width)
+        self.TLY = self.top_left_Y * (self.im_height / self.displayed_im_height)
         self.is_dragging = True
 
     def endclick(self, event):
         """Records the final mouse position upon button release."""
         self.hide()
-        self.bottom_right_X = event.x
-        self.bottom_right_Y = event.y
-        # Scale coordinates to original image dimensions
-        self.BRX = self.bottom_right_X * (self.im_width / 640)
-        self.BRY = self.bottom_right_Y * (self.im_height / 420)
+        # Adjust event coordinates by image offset before storing
+        adjusted_x = event.x - self.image_offset_x
+        adjusted_y = event.y - self.image_offset_y
+
+        self.bottom_right_X = adjusted_x
+        self.bottom_right_Y = adjusted_y
+        # Scale coordinates to original image dimensions using displayed image dimensions
+        self.BRX = self.bottom_right_X * (self.im_width / self.displayed_im_width)
+        self.BRY = self.bottom_right_Y * (self.im_height / self.displayed_im_height)
 
     def update(self, event):
         """Updates the interactive selection shape and cross-hairs during a drag."""
@@ -109,7 +125,7 @@ class MousePositionTracker(tk.Frame):
     def autodraw(self,command=lambda *args: None):
         """Sets up automatic drawing for ROI selection."""
         self.reset()
-        self.ALL_ROIs=pd.DataFrame(columns=['ROI','TLX','TLY','BRX','BRY','FPS'])
+        self.ALL_ROIs=pd.DataFrame(columns=['ROI','TLX','TLY','BRX','BRY','ShapeType','Color']) # Added ShapeType and Color to initial columns
         self._command = command
         self.canvas.bind("<Button-1>", self.begin)
         self.canvas.bind("<B1-Motion>", self.update)
@@ -121,7 +137,7 @@ class MousePositionTracker(tk.Frame):
         with open('COLOURS.json') as json_file:
             COLOURS = json.load(json_file)
       
-        colour=random.choice(COLOURS)
+        colour = random.choice(COLOURS) # Select a random color
         USER_INP = simpledialog.askstring(title="ROI name",
                                   prompt="ROI name:")
         if not USER_INP: # Handle case where user cancels the dialog
@@ -141,36 +157,44 @@ class MousePositionTracker(tk.Frame):
         current_x2 = self.selection_obj.current_x2
         current_y2 = self.selection_obj.current_y2
 
-        # Scale coordinates back to original image dimensions for data storage
-        # Assumes 640x420 is the display canvas size.
-        scaled_tlx = min(current_x1, current_x2) * (self.im_width / 640)
-        scaled_tly = min(current_y1, current_y2) * (self.im_height / 420)
-        scaled_brx = max(current_x1, current_x2) * (self.im_width / 640)
-        scaled_bry = max(current_y1, current_y2) * (self.im_height / 420)
+        # Adjust coordinates to be relative to the image's top-left corner
+        # before scaling for storage.
+        adjusted_x1 = current_x1 - self.image_offset_x
+        adjusted_y1 = current_y1 - self.image_offset_y
+        adjusted_x2 = current_x2 - self.image_offset_x
+        adjusted_y2 = current_y2 - self.image_offset_y
 
-        # Create a DataFrame row for the new ROI, including its shape type
+        # Scale adjusted coordinates back to original image dimensions for data storage
+        scaled_tlx = min(adjusted_x1, adjusted_x2) * (self.im_width / self.displayed_im_width)
+        scaled_tly = min(adjusted_y1, adjusted_y2) * (self.im_height / self.displayed_im_height)
+        scaled_brx = max(adjusted_x1, adjusted_x2) * (self.im_width / self.displayed_im_width)
+        scaled_bry = max(adjusted_y1, adjusted_y2) * (self.im_height / self.displayed_im_height)
+        # Create a DataFrame row for the new ROI, including its shape type and color
         Current_ROI=pd.DataFrame({'ROI':USER_INP,
                                       'TLX':scaled_tlx,
                                       'TLY':scaled_tly,
                                       'BRX':scaled_brx,
                                       'BRY':scaled_bry,
-                                      'ShapeType': shape_type},index=[0])
+                                      'ShapeType': shape_type,
+                                      'Color': colour},index=[0])
 
         # Use _append for future compatibility
         self.ALL_ROIs = self.ALL_ROIs._append(Current_ROI, ignore_index=True)
 
-        # Crop and display the image within the selected ROI
-        img = ImageTk.PhotoImage(self.my_imo.crop((min(current_x1,current_x2),min(current_y1,current_y2),max(current_x1,current_x2),max(current_y1,current_y2))))
-        self.im_list.append(img) # Keep a reference to prevent garbage collection
-        self.image_on_canvas=self.canvas.create_image(min(current_x1,current_x2),min(current_y1,current_y2), image=img, anchor=tk.NW)
-
         # Draw the permanent shape on the canvas based on the selected type
         if self.canvas is not None and self.shape_type_var is not None:
+            # Use the raw canvas coordinates directly, as SelectionObject already provides them
+            # and they are relative to the canvas, not the image's top-left.
+            display_tlx = min(current_x1, current_x2)
+            display_tly = min(current_y1, current_y2)
+            display_brx = max(current_x1, current_x2)
+            display_bry = max(current_y1, current_y2)
+
             if shape_type == "Rectangle":
-                shape_id = self.canvas.create_rectangle(current_x1, current_y1, current_x2, current_y2, outline=colour,width=5)
+                shape_id = self.canvas.create_rectangle(display_tlx, display_tly, display_brx, display_bry, outline=colour, width=5)
             elif shape_type == "Circle":
                 # For circle, the stored coords are the bounding box of the circle
-                shape_id = self.canvas.create_oval(current_x1, current_y1, current_x2, current_y2, outline=colour,width=5)
+                shape_id = self.canvas.create_oval(display_tlx, display_tly, display_brx, display_bry, outline=colour, width=5)
 
             # Bring the newly created permanent shape to the front
             self.canvas.lift(shape_id)
@@ -334,6 +358,11 @@ class MousePositionTracker(tk.Frame):
         if not path: # Handle case where user cancels file dialog
             self.text.insert(tk.INSERT, "\nROI file loading cancelled.")
             return
+        
+        if self.my_imo is None:
+            self.text.insert(tk.INSERT, "\nPlease load a video frame first to set image dimensions before loading ROIs.")
+            return
+
         self.ALL_ROIs = pd.read_csv(path)
         # Assuming FPS is stored in the first row of the 'FPS' column
         if 'FPS' in self.ALL_ROIs.columns:
@@ -343,6 +372,49 @@ class MousePositionTracker(tk.Frame):
             # Default FPS to a common value or prompt user if critical
             self.fps = 30 # Default value if not found
         self.text.insert(tk.INSERT, f"\nLoaded ROI definitions from {os.path.basename(path)}. FPS set to {self.fps}.")
+        
+        # After loading, draw all ROIs on the canvas
+        self.draw_all_loaded_ROIs()
+
+    def draw_all_loaded_ROIs(self):
+        """Draws all ROIs currently stored in self.ALL_ROIs onto the canvas."""
+        if self.canvas is None:
+            self.text.insert(tk.INSERT, "\nCannot draw ROIs: Canvas not initialized.")
+            return
+        
+        if self.im_width is None or self.im_height is None:
+            self.text.insert(tk.INSERT, "\nCannot draw ROIs: Original image dimensions are not set. Load a video first.")
+            return
+
+        # Clear existing ROI drawings on the canvas before redrawing
+        self.canvas.delete("loaded_roi") # Delete items with the tag "loaded_roi"
+        
+        with open('COLOURS.json') as json_file:
+            COLOURS = json.load(json_file)
+
+        for index, roi_data in self.ALL_ROIs.iterrows():
+            roi_name = roi_data['ROI']
+            # Scale coordinates from original image dimensions to displayed canvas dimensions
+            scaled_tlx = roi_data['TLX'] * (self.displayed_im_width / self.im_width)
+            scaled_tly = roi_data['TLY'] * (self.displayed_im_height / self.im_height)
+            scaled_brx = roi_data['BRX'] * (self.displayed_im_width / self.im_width)
+            scaled_bry = roi_data['BRY'] * (self.displayed_im_height / self.im_height)
+            shape_type = roi_data.get('ShapeType', 'Rectangle') # Default to Rectangle for older files
+            colour = roi_data.get('Color', random.choice(COLOURS)) # Use stored color, or random if not found (for old files)
+
+            # Adjust coordinates by the image offset on the canvas
+            display_tlx = scaled_tlx + self.image_offset_x
+            display_tly = scaled_tly + self.image_offset_y
+            display_brx = scaled_brx + self.image_offset_x
+            display_bry = scaled_bry + self.image_offset_y
+
+            if shape_type == "Rectangle":
+                self.canvas.create_rectangle(display_tlx, display_tly, display_brx, display_bry,
+                                             outline=colour, width=5, tags="loaded_roi")
+            elif shape_type == "Circle":
+                self.canvas.create_oval(display_tlx, display_tly, display_brx, display_bry,
+                                        outline=colour, width=5, tags="loaded_roi")
+            self.text.insert(tk.INSERT, f"\nDrew loaded ROI: {roi_name} ({shape_type})")
 
     def Analyse_ROI(self):        
         """Placeholder for further ROI analysis. Currently calculates value counts."""
@@ -379,13 +451,36 @@ class MousePositionTracker(tk.Frame):
             self.text.insert(tk.INSERT, f"\nError reading batch file {batch_file_path}: {e}")
             return
 
+        print(f"DEBUG: Starting batch processing for file: {batch_file_path}")
+        try:
+            batch_df = pd.read_csv(batch_file_path)
+            print(f"DEBUG: Successfully read batch file. Number of entries: {len(batch_df)}")
+        except Exception as e:
+            self.text.insert(tk.INSERT, f"\nError reading batch file {batch_file_path}: {e}")
+            print(f"ERROR: Failed to read batch file: {e}")
+            return
+
+        print(f"Starting batch processing for file: {batch_file_path}")
+        try:
+            batch_df = pd.read_csv(batch_file_path)
+            self.text.insert(tk.INSERT, f"\nSuccessfully read batch file. Number of entries: {len(batch_df)}")
+        except Exception as e:
+            self.text.insert(tk.INSERT, f"\nError reading batch file {batch_file_path}: {e}")
+            return
+
         results = []
 
-        for index, row in batch_df.iterrows():
-            shape_file = row[0] # Assuming first column is ROI file path
-            h5_file = row[1]    # Assuming second column is DLC file path
+        # Ensure the batch file has the expected columns
+        if batch_df.shape[1] < 2:
+            self.text.insert(tk.INSERT, f"\nError: Batch file '{batch_file_path}' must have at least two columns (ROI_File_Path, DLC_File_Path).")
+            return
+
+        # Use tqdm for progress bar
+        for index, row in tqdm.tqdm(batch_df.iterrows(), total=len(batch_df), desc="Processing DLC files"):
+            shape_file = row.iloc[0] # Assuming first column is ROI file path
+            dlc_file = row.iloc[1]    # Assuming second column is DLC file path (can be .h5 or .csv)
             
-            self.text.insert(tk.INSERT, f"\nProcessing: ROI='{os.path.basename(shape_file)}', DLC='{os.path.basename(h5_file)}'")
+            self.text.insert(tk.INSERT, f"\nProcessing: ROI='{os.path.basename(shape_file)}', DLC='{os.path.basename(dlc_file)}'")
 
             try:
                 # Load ROI data
@@ -397,18 +492,19 @@ class MousePositionTracker(tk.Frame):
                     self.fps = 30 # Default if FPS column is missing
                     self.text.insert(tk.INSERT, "\nWarning: 'FPS' column not found in ROI file. Defaulting to 30 FPS.")
 
-                # Load DLC data
-                if h5_file.endswith('.h5'):
-                    self.data = pd.read_hdf(h5_file)
-                else:
-                    self.data = pd.read_csv(h5_file, header=[0, 1, 2])
+                # Load DLC data (supports both .h5 and .csv files)
+                if dlc_file.endswith('.h5'):
+                    self.data = pd.read_hdf(dlc_file)
+                else: # Assume it's a CSV if not .h5
+                    # For CSVs, the first column is typically the frame index
+                    self.data = pd.read_csv(dlc_file, header=[0, 1, 2], index_col=0)
                 
                 # Clean DLC data columns
                 self.data.columns = self.data.columns.droplevel(0) # Drop scorer level
                 self.data = self.data.drop('likelihood', axis=1, level=1) # Drop likelihood
 
                 # Load metadata for cropping if available
-                metadata = self.load_video_metadata(h5_file)
+                metadata = self.load_video_metadata(dlc_file)
                 self.cropping = False # Default to no cropping
                 if metadata:
                     self.cropping = metadata["data"]["cropping"]
@@ -420,13 +516,13 @@ class MousePositionTracker(tk.Frame):
                 analysis_result = self.analyze_data()
 
                 # Store results, including the filename for identification
-                result_row = {'h5_file': os.path.basename(h5_file)}
+                result_row = {'dlc_file': os.path.basename(dlc_file)}
                 result_row.update(analysis_result)
                 results.append(result_row)
 
             except Exception as e:
-                self.text.insert(tk.INSERT, f"\nError processing {os.path.basename(h5_file)} with {os.path.basename(shape_file)}: {e}")
-                results.append({'h5_file': os.path.basename(h5_file), 'error': str(e)})
+                self.text.insert(tk.INSERT, f"\nError processing {os.path.basename(dlc_file)} with {os.path.basename(shape_file)}: {e}")
+                results.append({'dlc_file': os.path.basename(dlc_file), 'error': str(e)})
 
         # Write all collected results to a single output CSV file
         if results:
