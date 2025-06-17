@@ -10,11 +10,6 @@ $ conda env create -f ROI_ENV.yml
 ```
 The main one is that it requires pandas to not be on version 1.x. We use `pandas=0.25.3` :).
 
-For batch processing, you will also need `tqdm` for progress bars:
-```bash
-$ pip install tqdm
-```
-
 ![ROI](static/ROI_tool.jpg)
 
 
@@ -62,7 +57,7 @@ This tool now supports processing multiple DeepLabCut files with corresponding R
 1.  **Prepare your batch CSV file:** Create a CSV file with two columns. The first column should contain the full paths to your `shape.csv` files (the ROI definitions), and the second column should contain the full paths to your DeepLabCut `.h5` or `.csv` files. Do not forget the header row !
     Example `example_batchinput.csv`:
 
-| shape_file_path        | h5_file_path           |
+| shape_file_path        | file_path           |
 |------------------------|------------------------|
 | shapes/circ_right_1.csv | h5data/random_mouse.h5 |
 2.  **Click "Process Batch":** In the GUI, click the "Process Batch" button.
